@@ -3,6 +3,7 @@ import logging
 from typing import List, Dict
 from .subtitle import Subtitle, ParsingException, FileContentException
 from libs.subcleaner import cleaner, report_generator, languages, regex_lists
+from libs.subcleaner.cleaner import text_cleaner
 from .settings import args, config
 
 logger = logging.getLogger(__name__)
@@ -87,9 +88,31 @@ def clean_file(subtitle_file: Path) -> None:
     if subtitle.ad_blocks:
         changes = True
     cleaner.remove_ads(subtitle)
+    
     if config.fix_overlaps:
         changes = changes or cleaner.fix_overlap(subtitle)
     cleaner.reset()
+    
+    # Apply text cleaning operations after original ad removal
+    text_cleaner.reset_stats()
+    initial_block_count = len(subtitle.blocks)
+    text_cleaner.clean_text(subtitle)
+    if config.text_cleaning.merge_identical_cues:
+        text_cleaner.merge_identical_consecutive_cues(subtitle)
+    
+    # Remove blocks that were marked for deletion during text cleaning
+    if subtitle.ad_blocks:
+        changes = True
+        cleaner.remove_ads(subtitle)
+    
+    # Mark changes if blocks were removed during merge or text was modified
+    if len(subtitle.blocks) < initial_block_count:
+        changes = True
+    
+    # Check if any text cleaning was actually performed
+    cleaning_stats = text_cleaner.get_stats()
+    if any(cleaning_stats.values()):
+        changes = True
 
     if len(subtitle.blocks) == 0:
         l = list(subtitle.ad_blocks)
@@ -109,8 +132,8 @@ def clean_file(subtitle_file: Path) -> None:
 
     logger.info(f"Done. Cleaning report:\n{report_generator.generate_report(subtitle)}\n")
     files_handled.append(subtitle_file.name)
-    if changes:
-        logger.info("no ads found") 
+    if not changes:
+        logger.info("no changes made")
 
     if args.dry_run:
         subtitle.to_content()

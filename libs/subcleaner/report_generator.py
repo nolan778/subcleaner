@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import *
 
 from libs.subcleaner.cleaner import cleaner
+from libs.subcleaner.cleaner import text_cleaner
 from libs.subcleaner.settings import args, config
 from libs.subcleaner.sub_block import SubBlock
 from libs.subcleaner.subtitle import Subtitle
@@ -13,6 +14,16 @@ _report: str
 def generate_report(subtitle: Subtitle) -> str:
     _reset()
     _add(f"{len(subtitle.ad_blocks)} deleted blocks and {len(subtitle.warning_blocks)} warnings remaining.")
+    
+    # Add text cleaning statistics
+    cleaning_stats = text_cleaner.get_stats()
+    if any(cleaning_stats.values()):
+        _add("")
+        _add(_text_cleaning_card(cleaning_stats), " " * 4)
+
+    if subtitle.text_cleaning_diffs:
+        _add("")
+        _add(_text_cleaning_diff_card(subtitle.text_cleaning_diffs), " " * 4)
 
     if subtitle.ad_blocks:
         _add("")
@@ -47,6 +58,51 @@ def _add(lines: str, spacer: str = "") -> None:
 def _reset() -> None:
     global _report
     _report = ""
+
+
+def _text_cleaning_card(stats: Dict[str, int]) -> str:
+    """Generate a card showing text cleaning statistics."""
+    card = "[------Text Cleaning Stats--------]\n"
+    
+    stat_labels = {
+        'music_notes_removed': 'Music note cues removed',
+        'sdh_cleaned': 'SDH patterns cleaned',
+        'speaker_labels_removed': 'Speaker labels removed',
+        'line_breaks_removed': 'Line breaks removed',
+        'dialog_markers_removed': 'Dialog markers removed',
+        'formatting_tags_removed': 'Formatting tags removed',
+        'curly_braces_cleaned': 'Curly braces cleaned',
+        'parentheses_cleaned': 'Parentheses cleaned',
+        'square_brackets_cleaned': 'Square brackets cleaned',
+        'asterisks_cleaned': 'Asterisks cleaned',
+        'hashtags_cleaned': 'Hashtags cleaned',
+        'uppercase_converted': 'Uppercase converted',
+        'cues_merged': 'Identical cues merged',
+    }
+    
+    has_stats = False
+    for key, label in stat_labels.items():
+        if stats.get(key, 0) > 0:
+            card += f"{label}: {stats[key]}\n"
+            has_stats = True
+    
+    if not has_stats:
+        card += "No text cleaning performed\n"
+    
+    card += "[---------------------------------]"
+    return card
+
+
+def _text_cleaning_diff_card(diffs: List[Dict[str, str]]) -> str:
+    card = "[------Text Cleaning Diff--------]\n"
+    for diff_entry in diffs:
+        index = diff_entry.get("index", "?")
+        time_range = diff_entry.get("time_range", "")
+        diff_text = diff_entry.get("diff", "")
+        card += f"Block {index} ({time_range})\n"
+        card += diff_text + "\n\n"
+    card = card[:-1] + "[---------------------------------]"
+    return card
 
 
 def _deleted_card(ad_blocks: Set[SubBlock]) -> str:

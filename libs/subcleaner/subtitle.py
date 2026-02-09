@@ -4,7 +4,7 @@ from typing import List, Set, Dict
 
 from . import languages
 from .settings import args, config
-from .sub_block import SubBlock, ParsingException
+from .sub_block import SubBlock, ParsingException, timedelta_to_time_string
 from libs import langdetect
 from pathlib import Path
 
@@ -21,12 +21,14 @@ class Subtitle:
     file: Path
     short_path: Path
     pre_content_artifact: str = ""
+    text_cleaning_diffs: List[Dict[str, str]]
 
     def __init__(self, subtitle_file: Path) -> None:
         self.file = subtitle_file
         self.blocks = []
         self.ad_blocks = set()
         self.warning_blocks = set()
+        self.text_cleaning_diffs = []
 
         file_content = read_file(self.file)
         self._parse_file_content(file_content)
@@ -275,6 +277,14 @@ class Subtitle:
             index += 1
         for block in self.ad_blocks:
             block.current_index = None
+
+    def add_text_cleaning_diff(self, block: SubBlock, diff: str) -> None:
+        time_range = f"{timedelta_to_time_string(block.start_time)} --> {timedelta_to_time_string(block.end_time)}"
+        self.text_cleaning_diffs.append({
+            "index": str(block.original_index),
+            "time_range": time_range,
+            "diff": diff,
+        })
 
     def __str__(self) -> str:
         return str(self.file)

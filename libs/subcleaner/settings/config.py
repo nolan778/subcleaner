@@ -8,6 +8,54 @@ from libs.subcleaner import languages
 
 logger = logging.getLogger(__name__)
 
+
+class TextCleaningConfig:
+    """Configuration for text cleaning operations."""
+    
+    def __init__(self, cfg: ConfigParser):
+        """Initialize text cleaning configuration from ConfigParser."""
+        # Get TEXT_CLEANING section or use defaults
+        if 'TEXT_CLEANING' not in cfg:
+            # Create default section
+            cfg.add_section('TEXT_CLEANING')
+        
+        section = cfg['TEXT_CLEANING']
+        
+        # General cleaning options
+        self.remove_sdh = section.getboolean('remove_sdh', False)
+        self.remove_speaker_labels = section.getboolean('remove_speaker_labels', False)
+        self.remove_music_notes = section.getboolean('remove_music_notes', False)
+        self.remove_line_breaks = section.getboolean('remove_line_breaks', False)
+        self.merge_identical_cues = section.getboolean('merge_identical_cues', False)
+        self.convert_uppercase_to_lowercase = section.getboolean('convert_uppercase_to_lowercase', False)
+        self.remove_dialog_markers = section.getboolean('remove_dialog_markers', False)
+        
+        # Text formatting options
+        self.remove_formatting_tags = section.getboolean('remove_formatting_tags', False)
+        self.preserve_italic_tags = section.getboolean('preserve_italic_tags', True)
+        self.preserve_bold_tags = section.getboolean('preserve_bold_tags', True)
+        self.preserve_font_tags = section.getboolean('preserve_font_tags', True)
+        
+        # Text between delimiters
+        self.remove_text_in_curly_braces = section.getboolean('remove_text_in_curly_braces', False)
+        self.remove_text_in_parentheses = section.getboolean('remove_text_in_parentheses', False)
+        self.remove_text_in_square_brackets = section.getboolean('remove_text_in_square_brackets', False)
+        self.remove_text_in_asterisks = section.getboolean('remove_text_in_asterisks', False)
+        self.remove_text_in_hashtags = section.getboolean('remove_text_in_hashtags', False)
+        
+        # Custom character filtering
+        custom_chars_str = section.get('custom_chars_to_remove', '[]')
+        # Parse custom characters/patterns from JSON array format
+        # Examples:
+        #   [] removes nothing (feature disabled)
+        #   ["j\""] removes lines containing j" anywhere in the line
+        import json
+        try:
+            self.custom_chars_to_remove = json.loads(custom_chars_str)
+        except (json.JSONDecodeError, ValueError):
+            logger.warning(f"Invalid JSON format for custom_chars_to_remove: {custom_chars_str}. Using empty list.")
+            self.custom_chars_to_remove = []
+
 home_dir = Path(libs.__file__).parent.parent
 try:
     home_dir = home_dir.relative_to(Path.cwd())
@@ -70,3 +118,5 @@ if default_language:
 
 use_english_on_all = cfg['SETTINGS'].getboolean("use_english_on_all", False)
 require_language_profile = cfg['SETTINGS'].getboolean("require_language_profile", True)
+# Initialize text cleaning configuration
+text_cleaning = TextCleaningConfig(cfg)
