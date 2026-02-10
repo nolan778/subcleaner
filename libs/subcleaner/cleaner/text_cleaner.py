@@ -174,8 +174,39 @@ def merge_identical_consecutive_cues(subtitle: Subtitle) -> None:
 
 
 def _contains_music_note(text: str) -> bool:
-    """Check if text contains music note character (♪)."""
-    return '♪' in text
+    """Check if text contains music note characters or mojibake music note patterns.
+
+    Detects:
+    - Actual Unicode music notes: ♪ (U+266A), ♫ (U+266B), ♬ (U+266C), ♩ (U+2669)
+    - Legacy encoding artifacts that represent music notes:
+      * J" or J" (J + smart quotes): Common in Windows-1252/ISO-8859-1 files
+      * j" or j" (j + smart quotes): Lowercase variant
+      * d" or d" (d + smart quotes): Another variant
+
+    These mojibake patterns occur when subtitle authoring tools use non-standard
+    characters that get corrupted during encoding conversion.
+    """
+    # Check for actual Unicode music note characters
+    if any(char in text for char in ['♪', '♫', '♬', '♩']):
+        return True
+
+    # Check for mojibake music note patterns
+    # Pattern: J, j, or d followed by smart quotes (U+201C or U+201D)
+    # These are common artifacts from legacy encodings
+    mojibake_patterns = [
+        'J\u201d',  # J + RIGHT DOUBLE QUOTATION MARK
+        'j\u201c',  # j + LEFT DOUBLE QUOTATION MARK
+        'J\u201c',  # J + LEFT DOUBLE QUOTATION MARK
+        'j\u201d',  # j + RIGHT DOUBLE QUOTATION MARK
+        'd\u201d',  # d + RIGHT DOUBLE QUOTATION MARK
+        'd\u201c',  # d + LEFT DOUBLE QUOTATION MARK
+    ]
+
+    for pattern in mojibake_patterns:
+        if pattern in text:
+            return True
+
+    return False
 
 
 def _contains_custom_chars(text: str) -> bool:

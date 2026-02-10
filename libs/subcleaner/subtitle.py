@@ -310,23 +310,33 @@ class FileContentException(Exception):
 
 
 def read_file(file: Path) -> str:
-    file_content: str
-    # todo: maybe fix decoding to be more reliable?
-    try:
-        with file.open("r", encoding="utf-8-sig") as opened_file:
-            file_content = opened_file.read()
-    except UnicodeDecodeError:
-        with file.open("r", encoding="cp1252") as opened_file:
-            file_content = opened_file.read()
-    if not "-->" in file_content:
+    """Read subtitle file with robust encoding detection and normalization.
+
+    Tries multiple encodings in order of likelihood and normalizes the result to UTF-8.
+    This ensures music notes and other special characters are properly decoded.
+    """
+    file_content: str = ""
+
+    # List of encodings to try, in order of preference
+    # UTF-8-sig handles UTF-8 files with BOM
+    encodings = ["utf-8-sig", "utf-8", "cp1252", "iso-8859-1", "latin-1", "utf-16"]
+
+    for encoding in encodings:
         try:
-            with file.open("r", encoding="utf-16") as opened_file:
+            with file.open("r", encoding=encoding) as opened_file:
                 file_content = opened_file.read()
-        except UnicodeDecodeError:
-            try:
-                with file.open("r", encoding="utf-8") as opened_file:
-                    file_content = opened_file.read()
-            except UnicodeDecodeError:
-                pass
+
+            # Validate that we got valid subtitle content
+            if "-->" in file_content:
+                # Successfully read with valid subtitle markers
+                break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+
+    if not file_content:
+        # Last resort: read as binary and decode with error handling
+        with file.open("rb") as opened_file:
+            raw_data = opened_file.read()
+            file_content = raw_data.decode("utf-8", errors="replace")
 
     return file_content
